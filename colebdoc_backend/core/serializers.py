@@ -2,6 +2,12 @@ from django.contrib.auth.models import User
 from rest_framework import serializers
 from .models import Document, DocumentPermission
 
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username']
+
 class DocumentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Document
@@ -17,9 +23,12 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_by', 'created_at', 'updated_at']
 
 class DocumentPermissionSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    user_id = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), write_only=True, source='user')
+
     class Meta:
         model = DocumentPermission
-        fields = ['id', 'user', 'document', 'role']
+        fields = ['id', 'user', 'user_id', 'document', 'role']
 
 
 

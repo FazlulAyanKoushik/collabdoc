@@ -5,7 +5,8 @@ from .views import (
     DocumentDeleteView,
     DocumentPermissionListCreateView,
     DocumentPermissionDetailView,
-    UserRegistrationView
+    UserRegistrationView,
+    UserListView
 )
 
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
@@ -22,4 +23,6 @@ urlpatterns = [
 
     path('permissions/', DocumentPermissionListCreateView.as_view(), name='permission-list-create'),
     path('permissions/<int:pk>/', DocumentPermissionDetailView.as_view(), name='permission-detail'),
+
+    path('users/', UserListView.as_view(), name='user-list'),
 ]
