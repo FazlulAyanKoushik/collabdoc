@@ -73,7 +73,7 @@ class DocumentPermissionListCreateView(generics.ListCreateAPIView):
 class DocumentPermissionDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = DocumentPermission.objects.all()
     serializer_class = DocumentPermissionSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanViewOrEditDocument, IsOwnerOrSharedEditor]
 
 
 class UserRegistrationView(generics.CreateAPIView):
