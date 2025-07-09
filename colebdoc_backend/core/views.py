@@ -1,3 +1,4 @@
+from django.contrib.auth.models import User
 from rest_framework import generics, permissions
 from rest_framework.permissions import BasePermission
 
@@ -5,7 +6,8 @@ from .models import Document, DocumentPermission
 from .serializers import (
     DocumentSerializer,
     DocumentDetailSerializer,
-    DocumentPermissionSerializer
+    DocumentPermissionSerializer,
+    UserRegistrationSerializer,
 )
 
 
@@ -20,9 +22,12 @@ class CanViewOrEditDocument(BasePermission):
 # 📄 Document Views
 
 class DocumentListCreateView(generics.ListCreateAPIView):
-    queryset = Document.objects.all()
     serializer_class = DocumentSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        return Document.objects.filter(created_by=user)
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
@@ -51,3 +56,8 @@ class DocumentPermissionDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = DocumentPermission.objects.all()
     serializer_class = DocumentPermissionSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+
+class UserRegistrationView(generics.CreateAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserRegistrationSerializer

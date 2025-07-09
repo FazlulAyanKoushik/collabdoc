@@ -4,10 +4,18 @@ from .views import (
     DocumentDetailView,
     DocumentDeleteView,
     DocumentPermissionListCreateView,
-    DocumentPermissionDetailView
+    DocumentPermissionDetailView,
+    UserRegistrationView
 )
 
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+
+
 urlpatterns = [
+    path('auth/register/', UserRegistrationView.as_view(), name='register'),
+    path('auth/token/', TokenObtainPairView.as_view(), name='token-obtain'),
+    path('auth/token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
+
     path('documents/', DocumentListCreateView.as_view(), name='document-list-create'),
     path('documents/<int:pk>/', DocumentDetailView.as_view(), name='document-detail'),
     path('documents/<int:pk>/delete/', DocumentDeleteView.as_view(), name='document-delete'),
