@@ -1,29 +1,30 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import axios from 'axios';
 import * as Y from 'yjs';
 import { getAccessToken } from '../auth/authService';
 import SharePanel from './SharePanel';
+import { TextAreaBinding } from 'y-textarea';
 
 function Editor({ doc, onBack }) {
-    const textAreaRef = useRef(null);
-    const [text, setText] = useState('');
     const ydoc = useRef(new Y.Doc()).current;
-    const ytext = ydoc.getText('shared-text');
+    const textareaRef = useRef(null);
     const socketRef = useRef(null);
-    const hasChanges = useRef(false);
 
-    const safeSend = (socket, message) => {
+    // ✅ Safe WebSocket send
+    const safeSend = (message) => {
+        const socket = socketRef.current;
+        if (!socket) return;
+
         if (socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify(message));
         } else {
-            socket.addEventListener(
-                'open',
-                () => socket.send(JSON.stringify(message)),
-                { once: true }
-            );
+            socket.addEventListener('open', () => {
+                socket.send(JSON.stringify(message));
+            }, { once: true });
         }
     };
 
+    // Load saved CRDT state
     useEffect(() => {
         const fetchDoc = async () => {
             const res = await axios.get(`http://localhost:8000/api/documents/${doc.id}/`, {
@@ -35,26 +36,18 @@ function Editor({ doc, onBack }) {
             if (crdt && Object.values(crdt).length > 0) {
                 const update = new Uint8Array(Object.values(crdt));
                 Y.applyUpdate(ydoc, update);
-                setText(ytext.toString());
             }
         };
 
         fetchDoc();
-        ytext.observe(() => {
-            setText(ytext.toString());
-            hasChanges.current = true;
-        });
+    }, [doc.id, ydoc]);
 
-        return () => {
-            ytext.unobserve();
-        };
-    }, [doc.id, ydoc, ytext]);
-
+    // WebSocket sync
     useEffect(() => {
-        const socket = new WebSocket(`ws://localhost:8000/ws/crdt/`);
+        const socket = new WebSocket('ws://localhost:8000/ws/crdt/');
         socketRef.current = socket;
 
-        safeSend(socket, {
+        safeSend({
             action: 'subscribe',
             request_id: 'sub-1',
             doc_id: doc.id,
@@ -68,50 +61,52 @@ function Editor({ doc, onBack }) {
             }
         };
 
+        const sendUpdate = (update) => {
+            safeSend({
+                action: 'send_delta',
+                request_id: `delta-${Date.now()}`,
+                doc_id: doc.id,
+                delta: Array.from(update),
+            });
+        };
+
+        const onUpdate = (update) => {
+            sendUpdate(update);
+        };
+
+        ydoc.on('update', onUpdate);
+
         return () => {
-            safeSend(socket, {
+            safeSend({
                 action: 'unsubscribe',
                 request_id: 'unsub-1',
                 doc_id: doc.id,
             });
             socket.close();
+            ydoc.off('update', onUpdate);
         };
     }, [doc.id, ydoc]);
 
-    const handleChange = (e) => {
-        const newVal = e.target.value;
-        ytext.delete(0, ytext.length);
-        ytext.insert(0, newVal);
+    // Bind textarea to Yjs
+    useEffect(() => {
+        const ytext = ydoc.getText('shared-text');
+        const binding = new TextAreaBinding(ytext, textareaRef.current);
+        return () => binding.destroy();
+    }, [ydoc]);
 
-        const update = Y.encodeStateAsUpdate(ydoc);
-        hasChanges.current = true;
-
-        safeSend(socketRef.current, {
-            action: 'send_delta',
-            request_id: `delta-${Date.now()}`,
-            doc_id: doc.id,
-            delta: Array.from(update),
-        });
-    };
-
+    // Autosave to backend
     useEffect(() => {
         const interval = setInterval(() => {
-            if (hasChanges.current) {
-                const update = Y.encodeStateAsUpdate(ydoc);
-                axios.patch(
-                    `http://localhost:8000/api/documents/${doc.id}/`,
-                    { crdt_state: Array.from(update) },
-                    {
-                        headers: {
-                            Authorization: `Bearer ${getAccessToken()}`,
-                        },
-                    }
-                ).then(() => {
-                    hasChanges.current = false;
-                }).catch((err) => {
-                    console.error('Autosave failed:', err);
-                });
-            }
+            const update = Y.encodeStateAsUpdate(ydoc);
+            axios.patch(
+                `http://localhost:8000/api/documents/${doc.id}/`,
+                { crdt_state: Array.from(update) },
+                {
+                    headers: {
+                        Authorization: `Bearer ${getAccessToken()}`,
+                    },
+                }
+            ).catch((err) => console.error('Autosave error:', err));
         }, 5000);
 
         return () => clearInterval(interval);
@@ -121,13 +116,7 @@ function Editor({ doc, onBack }) {
         <div>
             <h2>Editing: {doc.title}</h2>
             <button onClick={onBack}>← Back to documents</button>
-            <textarea
-                ref={textAreaRef}
-                rows={20}
-                cols={80}
-                value={text}
-                onChange={handleChange}
-            />
+            <textarea ref={textareaRef} rows={20} cols={80} />
             <SharePanel docId={doc.id} />
         </div>
     );

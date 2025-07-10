@@ -8,7 +8,7 @@ function SharePanel({ docId }) {
     const [message, setMessage] = useState('');
     const [collaborators, setCollaborators] = useState([]);
 
-    const fetchCollaborators = async () => {
+    const fetchCollaborators = useCallback(async () => {
         try {
             const res = await axios.get('http://localhost:8000/api/permissions/', {
                 headers: {
@@ -20,7 +20,7 @@ function SharePanel({ docId }) {
         } catch (err) {
             console.error('Failed to fetch collaborators', err);
         }
-    };
+    }, [docId]);
 
     const handleShare = async () => {
         try {
@@ -53,16 +53,29 @@ function SharePanel({ docId }) {
 
             setMessage(`Shared with ${username} as ${role}`);
             setUsername('');
-            fetchCollaborators(); // refresh list
+            fetchCollaborators();
         } catch (err) {
             console.error(err);
             setMessage('Error sharing document');
         }
     };
 
+    const handleRemove = async (permissionId) => {
+        try {
+            await axios.delete(`http://localhost:8000/api/permissions/${permissionId}/`, {
+                headers: {
+                    Authorization: `Bearer ${getAccessToken()}`,
+                },
+            });
+            fetchCollaborators();
+        } catch (err) {
+            console.error('Failed to remove collaborator', err);
+        }
+    };
+
     useEffect(() => {
         fetchCollaborators();
-    }, [docId]);
+    }, [fetchCollaborators]);
 
     return (
         <div style={{ marginTop: 30 }}>
@@ -83,7 +96,10 @@ function SharePanel({ docId }) {
             <ul>
                 {collaborators.map((c) => (
                     <li key={c.id}>
-                        {c.user.username} — {c.role}
+                        {c.user.username} — {c.role}{' '}
+                        <button onClick={() => handleRemove(c.id)} style={{ color: 'red' }}>
+                            🗑 Remove
+                        </button>
                     </li>
                 ))}
             </ul>
