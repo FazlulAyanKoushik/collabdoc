@@ -1,4 +1,4 @@
-## 📝 ColebDoc: Real-Time Collaborative Document Editor
+## 📝 CollabDoc: Real-Time Collaborative Document Editor
 A full-stack real-time collaborative document editor built with:
 
 * 🧠 CRDT (Yjs) for concurrent editing
